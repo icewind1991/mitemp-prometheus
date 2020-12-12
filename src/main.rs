@@ -1,45 +1,111 @@
 use main_error::MainError;
-use mitemp::{adapter_by_mac, BDAddr, Sensor};
+use mitemp::{adapter_by_mac, listen, BDAddr, Sensor};
 use std::collections::HashMap;
+use std::fmt::Write;
 use std::str::FromStr;
+use std::sync::{Arc, Mutex};
+use std::thread::spawn;
 use warp::Filter;
+
+type Cache = Arc<Mutex<HashMap<BDAddr, Sensor>>>;
 
 #[tokio::main]
 async fn main() -> Result<(), MainError> {
+    let cache: Cache = Arc::default();
+
     let mut env: HashMap<String, String> = dotenv::vars().collect();
     let adapter = BDAddr::from_str(&env.remove("ADAPTER").ok_or("No ADDR set")?)
         .map_err(|_| "Invalid adapter address")?;
-    let device = BDAddr::from_str(&env.remove("DEVICE").ok_or("No DEVICE set")?)
-        .map_err(|_| "Invalid device address")?;
     let port = env
         .get("PORT")
         .and_then(|s| u16::from_str(s).ok())
         .unwrap_or(80);
-    let name = env.remove("NAME").ok_or("No NAME set")?;
+    let names = env.remove("NAMES").unwrap_or_default();
+    let names = names
+        .split(',')
+        .map(|pair| {
+            let mut parts = pair.split('=');
+            if let (Some(Ok(mac)), Some(name)) = (parts.next().map(BDAddr::from_str), parts.next())
+            {
+                Ok((mac, name.to_string()))
+            } else {
+                Err(MainError::from("Invalid NAMES"))
+            }
+        })
+        .collect::<Result<HashMap<BDAddr, String>, MainError>>()?;
 
     let adapter = adapter_by_mac(adapter).map_err(|_| "Adapter not found")?;
 
-    let sensor = Sensor::new(adapter, device).start();
+    let rx = listen(adapter).map_err(|e| format!("Failed to start btle listen: {}", e))?;
+
+    let rx_cache = cache.clone();
+    spawn(move || loop {
+        let sensor = rx.recv().unwrap();
+        rx_cache.lock().unwrap().insert(sensor.mac, sensor);
+    });
 
     let metrics = warp::path!("metrics").map(move || {
-        let data = sensor.get_data();
-        if data.temperature == 0.0 || data.humidity == 0.0 {
-            return String::new();
+        let mut result = String::new();
+
+        for sensor in cache.lock().unwrap().values() {
+            format(&mut result, sensor, &names).unwrap();
         }
-        if data.battery > 0 {
-            format!(
-                "sensor_temperature{{name=\"{name}\"}} {temperature}\nsensor_humidity{{name=\"{name}\"}} {humidity}\nsensor_battery{{name=\"{name}\"}} {battery}\n",
-                name = name, temperature = data.temperature, humidity = data.humidity, battery = data.battery
-            )
-        } else {
-            format!(
-                "sensor_temperature{{name=\"{name}\"}} {temperature}\nsensor_humidity{{name=\"{name}\"}} {humidity}\n",
-                name = name, temperature = data.temperature, humidity = data.humidity
-            )
-        }
+
+        result
     });
 
     warp::serve(metrics).run(([0, 0, 0, 0], port)).await;
+
+    Ok(())
+}
+
+fn format<W: Write>(
+    mut writer: W,
+    sensor: &Sensor,
+    names: &HashMap<BDAddr, String>,
+) -> std::fmt::Result {
+    if sensor.data.temperature == 0.0 || sensor.data.humidity == 0.0 {
+        return Ok(());
+    }
+    let name = names.get(&sensor.mac);
+    if sensor.data.battery > 0 {
+        if let Some(name) = name {
+            writeln!(
+                writer,
+                "sensor_battery{{name=\"{}\", mac=\"{}\"}} {}",
+                name, sensor.mac, sensor.data.battery
+            )?;
+        } else {
+            writeln!(
+                writer,
+                "sensor_battery{{mac=\"{}\"}} {}",
+                sensor.mac, sensor.data.battery
+            )?;
+        }
+    }
+    if let Some(name) = name {
+        writeln!(
+            writer,
+            "sensor_temperature{{name=\"{}\", mac=\"{}\"}} {}",
+            name, sensor.mac, sensor.data.temperature
+        )?;
+        writeln!(
+            writer,
+            "sensor_humidity{{name=\"{}\", mac=\"{}\"}} {}",
+            name, sensor.mac, sensor.data.humidity
+        )?;
+    } else {
+        writeln!(
+            writer,
+            "sensor_temperature{{mac=\"{}\"}} {}",
+            sensor.mac, sensor.data.temperature
+        )?;
+        writeln!(
+            writer,
+            "sensor_humidity{{mac=\"{}\"}} {}",
+            sensor.mac, sensor.data.humidity
+        )?;
+    }
 
     Ok(())
 }
