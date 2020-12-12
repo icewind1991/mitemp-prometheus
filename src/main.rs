@@ -36,12 +36,13 @@ async fn main() -> Result<(), MainError> {
 
     let adapter = adapter_by_mac(adapter).map_err(|_| "Adapter not found")?;
 
-    let rx = listen(adapter).map_err(|e| format!("Failed to start btle listen: {}", e))?;
+    let iter = listen(adapter).map_err(|e| format!("Failed to start btle listen: {}", e))?;
 
     let rx_cache = cache.clone();
-    spawn(move || loop {
-        let sensor = rx.recv().unwrap();
-        rx_cache.lock().unwrap().insert(sensor.mac, sensor);
+    spawn(move || {
+        for sensor in iter {
+            rx_cache.lock().unwrap().insert(sensor.mac, sensor);
+        }
     });
 
     let metrics = warp::path!("metrics").map(move || {

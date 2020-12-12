@@ -1057,7 +1057,7 @@ dependencies = [
 [[package]]
 name = "mitemp"
 version = "0.2.0"
-source = "git+https://github.com/icewind1991/mitemp-rs#2d673c48fa3751f8248209a3ef10ebdb8673d1ea"
+source = "git+https://github.com/icewind1991/mitemp-rs#16cf74d09fe8546a592c3af5bce4a83f7b29af8a"
 dependencies = [
  "btleplug",
  "num_enum",
