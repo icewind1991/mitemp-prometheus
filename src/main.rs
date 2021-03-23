@@ -77,11 +77,7 @@ fn format<W: Write>(
                 name, sensor.mac, sensor.data.battery
             )?;
         } else {
-            writeln!(
-                writer,
-                "sensor_battery{{mac=\"{}\"}} {}",
-                sensor.mac, sensor.data.battery
-            )?;
+            eprintln!("Skipping unnamed censor {}", sensor.mac);
         }
     }
     if let Some(name) = name {
@@ -96,16 +92,7 @@ fn format<W: Write>(
             name, sensor.mac, sensor.data.humidity
         )?;
     } else {
-        writeln!(
-            writer,
-            "sensor_temperature{{mac=\"{}\"}} {}",
-            sensor.mac, sensor.data.temperature
-        )?;
-        writeln!(
-            writer,
-            "sensor_humidity{{mac=\"{}\"}} {}",
-            sensor.mac, sensor.data.humidity
-        )?;
+        eprintln!("Skipping unnamed censor {}", sensor.mac);
     }
 
     Ok(())
