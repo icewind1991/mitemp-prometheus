@@ -11,5 +11,6 @@ dotenv = "0.15.0"
 main_error = "0.1.0"
 tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
 warp = "0.3"
-mitemp = { version = "0.2.0", git = "https://github.com/icewind1991/mitemp-rs" }
-
+mitemp = "0.3"
+tokio-stream = "0.1"
+btleplug = "0.9"

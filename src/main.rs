@@ -1,10 +1,13 @@
+use btleplug::api::Manager as _;
+use btleplug::platform::Manager;
 use main_error::MainError;
-use mitemp::{adapter_by_mac, listen, BDAddr, Sensor};
+use mitemp::{listen, BDAddr, Sensor};
 use std::collections::HashMap;
 use std::fmt::Write;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
-use std::thread::spawn;
+use tokio::{pin, spawn};
+use tokio_stream::StreamExt;
 use warp::Filter;
 
 type Cache = Arc<Mutex<HashMap<BDAddr, Sensor>>>;
@@ -14,8 +17,6 @@ async fn main() -> Result<(), MainError> {
     let cache: Cache = Arc::default();
 
     let mut env: HashMap<String, String> = dotenv::vars().collect();
-    let adapter = BDAddr::from_str(&env.remove("ADAPTER").ok_or("No ADDR set")?)
-        .map_err(|_| "Invalid adapter address")?;
     let port = env
         .get("PORT")
         .and_then(|s| u16::from_str(s).ok())
@@ -34,16 +35,24 @@ async fn main() -> Result<(), MainError> {
         })
         .collect::<Result<HashMap<BDAddr, String>, MainError>>()?;
 
-    let adapter = adapter_by_mac(adapter).map_err(|_| "Adapter not found")?;
+    let manager = Manager::new().await?;
+    for adapter in manager.adapters().await? {
+        let rx_cache = cache.clone();
+        spawn(async move {
+            let stream = match listen(&adapter).await {
+                Ok(stream) => stream,
+                Err(e) => {
+                    eprintln!("Failed to listen to adapter: {:#}", e);
+                    return;
+                }
+            };
+            pin!(stream);
 
-    let iter = listen(adapter).map_err(|e| format!("Failed to start btle listen: {}", e))?;
-
-    let rx_cache = cache.clone();
-    spawn(move || {
-        for sensor in iter {
-            rx_cache.lock().unwrap().insert(sensor.mac, sensor);
-        }
-    });
+            while let Some(sensor) = stream.next().await {
+                rx_cache.lock().unwrap().insert(sensor.mac, sensor);
+            }
+        });
+    }
 
     let metrics = warp::path!("metrics").map(move || {
         let mut result = String::new();

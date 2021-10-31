@@ -7,7 +7,6 @@ Expose Xiaomi MI Temperature and Humidity Sensor to prometheus
 Run the binary with the following environment variables
 
 ```dotenv
-ADAPTER=00:1A:7D:DA:71:01
 PORT=3030
 NAMES="58:2d:34:39:1a:01=Sensor 1,58:2d:34:39:1a:02=Sensor 2"
 ```
