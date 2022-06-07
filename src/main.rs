@@ -1,5 +1,6 @@
-use btleplug::api::Manager as _;
+use btleplug::api::{Central, Manager as _};
 use btleplug::platform::Manager;
+use log::info;
 use main_error::MainError;
 use mitemp::{listen, BDAddr, Sensor};
 use std::collections::HashMap;
@@ -14,6 +15,7 @@ type Cache = Arc<Mutex<HashMap<BDAddr, Sensor>>>;
 
 #[tokio::main]
 async fn main() -> Result<(), MainError> {
+    env_logger::init();
     let cache: Cache = Arc::default();
 
     let mut env: HashMap<String, String> = dotenv::vars().collect();
@@ -39,6 +41,9 @@ async fn main() -> Result<(), MainError> {
     for adapter in manager.adapters().await? {
         let rx_cache = cache.clone();
         spawn(async move {
+            if let Ok(info) = adapter.adapter_info().await {
+                info!("Listening on {}", info);
+            }
             let stream = match listen(&adapter).await {
                 Ok(stream) => stream,
                 Err(e) => {
@@ -49,6 +54,7 @@ async fn main() -> Result<(), MainError> {
             pin!(stream);
 
             while let Some(sensor) = stream.next().await {
+                info!("Got update for {}: {:?}", sensor.mac, sensor.data);
                 rx_cache.lock().unwrap().insert(sensor.mac, sensor);
             }
         });
@@ -86,7 +92,7 @@ fn format<W: Write>(
                 name, sensor.mac, sensor.data.battery
             )?;
         } else {
-            eprintln!("Skipping unnamed censor {}", sensor.mac);
+            info!("Skipping unnamed censor {}", sensor.mac);
         }
     }
     if let Some(name) = name {
@@ -101,7 +107,7 @@ fn format<W: Write>(
             name, sensor.mac, sensor.data.humidity
         )?;
     } else {
-        eprintln!("Skipping unnamed censor {}", sensor.mac);
+        info!("Skipping unnamed censor {}", sensor.mac);
     }
 
     Ok(())
