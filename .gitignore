@@ -1,2 +1,6 @@
 /target
+**/*.rs.bk
+result
+.direnv
 .env
+config.toml

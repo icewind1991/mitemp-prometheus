@@ -1,18 +1,26 @@
 [package]
 name = "mitemp-prometheus"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Robin Appelman <robin@icewind.nl>"]
-edition = "2018"
+edition = "2021"
 description = "Expose Xiaomi MI Temperature and Humidity Sensor to prometheus"
 license = "MIT/Apache-2.0"
+rust-version = "1.74.0"
 
 [dependencies]
-dotenv = "0.15.0"
+dotenvy = "0.15.7"
 main_error = "0.1.0"
-tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
-warp = "0.3"
-mitemp = "0.3.1"
-tokio-stream = "0.1"
-btleplug = "0.9"
-env_logger = "0.9"
-log = "0.4"
+tokio = { version = "1.41.1", features = ["macros", "rt-multi-thread"] }
+warp = "0.3.7"
+mitemp = "0.4.0"
+tokio-stream = { version = "0.1.16", features = ["net"] }
+btleplug = { version = "0.11.6", features = ["serde"] }
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"
+serde = { version = "1.0.215", features = ["derive"] }
+toml = "0.8.19"
+secretfile = "0.1.0"
+clap = { version = "4.5.20", features = ["derive"] }
+
+[patch.crates-io]
+btleplug = { git = "https://github.com/icewind1991/btleplug/", branch = "bdaddr-deserialize-string" }
