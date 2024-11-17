@@ -71,11 +71,20 @@ in
         RestrictAddressFamilies = [ "AF_UNIX" ];
         RuntimeDirectory = "mitemp";
         RestrictRealtime = true;
-        ProtectProc = "noaccess";
+        ProtectProc = "invisible";
         SystemCallFilter = [ "@system-service" "~@resources" "~@privileged" ];
         IPAddressDeny = "any";
         PrivateUsers = true;
         ProcSubset = "pid";
+        RemoveIPC = true;
+        PrivateDevices = true;
+        RestrictSUIDSGID = true;
+        BindPaths = [ "/run/dbus" ];
+      };
+
+      confinement = {
+        enable = true;
+        binSh = null;
       };
     };
   };
