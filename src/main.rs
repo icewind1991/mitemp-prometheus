@@ -7,6 +7,8 @@ use main_error::MainError;
 use mitemp::{listen, BDAddr, Sensor};
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::Write;
+use std::fs::set_permissions;
+use std::os::unix::fs::PermissionsExt;
 use std::sync::{Arc, Mutex};
 use tokio::{pin, spawn};
 use tokio_stream::StreamExt;
@@ -76,7 +78,8 @@ async fn main() -> Result<(), MainError> {
             warp::serve(metrics).run((address, port)).await;
         }
         ListenConfig::Unix { socket: path } => {
-            let listener = UnixListener::bind(path).unwrap();
+            let listener = UnixListener::bind(&path)?;
+            set_permissions(&path, PermissionsExt::from_mode(0o666))?;
             let incoming = UnixListenerStream::new(listener);
             warp::serve(metrics).run_incoming(incoming).await;
         }
