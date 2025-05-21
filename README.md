@@ -1,3 +1,5 @@
+# Moved to https://codeberg.org/icewind/mitemp-prometheus
+
 # mitemp-prometheus
 
 Expose Xiaomi MI Temperature and Humidity Sensor to prometheus
